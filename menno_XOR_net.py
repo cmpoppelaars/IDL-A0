@@ -4,8 +4,8 @@ from functools import lru_cache
 
 class XOR_net:
     def __init__(self, activation="sigmoid", weights=None, **kwargs):
-        FUNC_TABLE = {"sigmoid": self.sigmoid, "relu": self.relu}
-        DFUNC_TABLE = {"sigmoid": self.dsigmoid, "relu": self.drelu}
+        FUNC_TABLE = {"sigmoid": self.sigmoid, "relu": self.relu, "tanh": self.tanh}
+        DFUNC_TABLE = {"sigmoid": self.dsigmoid, "relu": self.drelu, "tanh": self.dtanh}
         self.weights = (
             self.random_weights(
                 (9), bounds=kwargs["bounds"] if "bounds" in kwargs else [-1, 1]
@@ -76,10 +76,10 @@ class XOR_net:
     def random_weights(self, shape, bounds=[-1, 1]):
         return (bounds[1] - bounds[0]) * np.random.random(shape) + bounds[0]
 
-    def print_test(self):
+    def print_test(self, discrete=True):
         for inpt, output in zip(self.inputs, self.outputs):
             print(
-                f"{inpt[0]} | {inpt[1]} = {self.simulate(inpt).output(True)} [{output}]"
+                f"{inpt[0]} | {inpt[1]} = {self.simulate(inpt).output(discrete):.3f} [{output}]"
             )
         print(f"final mse: {self.mse()}")
 
@@ -91,6 +91,14 @@ class XOR_net:
     def dsigmoid(self, x):
         return self.sigmoid(x) * (1 - self.sigmoid(x))
 
+    @lru_cache()
+    def tanh(self, x):
+        return np.tanh(x)
+
+    @lru_cache()
+    def dtanh(self, x):
+        return np.cosh(x) ** -2
+
     def relu(self, x):
         return self.relu_a * x if x > 0 else 0
 
@@ -98,8 +106,8 @@ class XOR_net:
         return self.relu_a if x > 0 else 0
 
 
-nn = XOR_net()
-for i in range(10000):
-    nn.update_weights(0.01)
-nn.print_test()
+nn = XOR_net(activation="tanh")
+for i in range(100000):
+    nn.update_weights(0.1)
+nn.print_test(discrete=False)
 print(nn.weights.reshape((3, 3)))
