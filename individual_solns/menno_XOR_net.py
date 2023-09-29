@@ -3,16 +3,10 @@ from functools import lru_cache
 
 
 class XOR_net:
-    def __init__(self, activation="sigmoid", weights=None, **kwargs):
-        FUNC_TABLE = {"sigmoid": self.sigmoid, "relu": self.relu, "tanh": self.tanh}
-        DFUNC_TABLE = {"sigmoid": self.dsigmoid, "relu": self.drelu, "tanh": self.dtanh}
-        self.weights = (
-            self.random_weights(
-                (9), bounds=kwargs["bounds"] if "bounds" in kwargs else [-1, 1]
-            )
-            if weights is None
-            else weights
-        )
+    def __init__(self, activation="sigmoid", weights=None):
+        FUNC_TABLE = {"sigmoid": self.sigmoid, "tanh": self.tanh}
+        DFUNC_TABLE = {"sigmoid": self.dsigmoid, "tanh": self.dtanh}
+        self.weights = self.random_weights() if weights is None else weights
         # Storage for skipping the calculation of some variables
         # 0, 1: inputs of NN
         # 2, 3: values of the hidden layer pre activation
@@ -24,8 +18,6 @@ class XOR_net:
         self.dactf = DFUNC_TABLE[activation]  # derivative of activation function
         self.inputs = np.array([[0, 0], [0, 1], [1, 0], [1, 1]])
         self.outputs = np.array([0, 1, 1, 0])
-
-        self.relu_a = kwargs.get("relu_a")
 
     def simulate(self, inpt):
         self.store[:2] = inpt
@@ -73,15 +65,24 @@ class XOR_net:
     def update_weights(self, eta=0.01):
         self.weights -= eta * self.grdmse()
 
-    def random_weights(self, shape, bounds=[-1, 1]):
-        return (bounds[1] - bounds[0]) * np.random.random(shape) + bounds[0]
+    def random_weights(self):
+        weights = np.zeros((9))
+        weights[:6] = np.random.normal(0, np.sqrt(2 / (2 + 2)), (6))
+        weights[6:] = np.random.normal(0, np.sqrt(2 / (2 + 1)), (3))
+        return weights
 
     def print_test(self, discrete=True):
         for inpt, output in zip(self.inputs, self.outputs):
             print(
-                f"{inpt[0]} | {inpt[1]} = {self.simulate(inpt).output(discrete):.3f} [{output}]"
+                f"{inpt[0]} ^ {inpt[1]} = {self.simulate(inpt).output(discrete):{'.3f' if not discrete else ''}} [{output}]"
             )
         print(f"final mse: {self.mse()}")
+
+    def is_xor(self):
+        for inpt, output in zip(self.inputs, self.outputs):
+            if self.simulate(inpt).output(True) != output:
+                return False
+        return True
 
     @lru_cache()
     def sigmoid(self, x):
@@ -99,15 +100,32 @@ class XOR_net:
     def dtanh(self, x):
         return np.cosh(x) ** -2
 
-    def relu(self, x):
-        return self.relu_a * x if x > 0 else 0
 
-    def drelu(self, x):
-        return self.relu_a if x > 0 else 0
+# Lazy approach
+for i in range(10):
+    satisfied = False
+    n = 0
+    while not satisfied:
+        n += 1
+        nn = XOR_net()
+        satisfied = nn.is_xor()
+    nn.print_test(False)
+    print(n, nn.weights.reshape((3, 3)), sep="\n")
 
 
-nn = XOR_net(activation="tanh")
-for i in range(100000):
+n_loops = 10000
+# train network with sigmoid
+nn = XOR_net(activation="sigmoid")
+for i in range(n_loops):
     nn.update_weights(0.1)
-nn.print_test(discrete=False)
-print(nn.weights.reshape((3, 3)))
+    if not i % (n_loops // 10):
+        print(f"Epoch {i:{int(np.log10(n_loops))}}: MSE = {nn.mse():.4f}")
+nn.print_test()
+
+# train network with tanh
+nn = XOR_net(activation="tanh")
+for i in range(n_loops):
+    nn.update_weights(0.01)
+    if not i % (n_loops // 10):
+        print(f"Epoch {i:{int(np.log10(n_loops))}}: MSE = {nn.mse():.4f}")
+nn.print_test()
